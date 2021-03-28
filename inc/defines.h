@@ -14,11 +14,12 @@
 
 typedef struct
 {
-    unsigned char *img;
+    unsigned char *img=NULL;
     int height;
     int width;
     int channels;
     int size;
+    unsigned char *contour=NULL;
 } Image;
 
 #define GAUSSIAN_DIM 5
@@ -36,7 +37,10 @@ int V_SOBEL[SOBEL_DIM][SOBEL_DIM] = {
     {-2, 0, 2},
     {-1, 0, 1}};
 
-void preprocess(Image &img_in, Image &img_out);
+void ReadInputImage(Image &image_in, char *input_filename);
+void PreProcess(Image &img_in, Image &img_out);
+
+void DestroyImage(Image &img);
 
 #ifdef LAUNCH_CPU
 #include "cpu.h"

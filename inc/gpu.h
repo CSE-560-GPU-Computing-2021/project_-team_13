@@ -1,6 +1,16 @@
 #include "defines.h"
 
-void preprocess(Image &img_in, Image &img_out)
+void ReadInputImage(Image &image_in, char *input_filename)
 {
-    printf("Will preporcess here [GPU]\n");
+    assert(false && "Not implemented");
+}
+
+void PreProcess(Image &img_in, Image &img_out)
+{
+    assert(false && "Not implemented");
+}
+
+void DestroyImage(Image &img)
+{
+    assert(false && "Not implemented");
 }

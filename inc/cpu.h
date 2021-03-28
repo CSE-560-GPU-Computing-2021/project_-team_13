@@ -1,5 +1,14 @@
 #include "defines.h"
 
+void ReadInputImage(Image &image_in, char *input_filename)
+{
+    image_in.img = stbi_load(input_filename, &image_in.width, &image_in.height, &image_in.channels, 3);
+    image_in.size = image_in.width * image_in.height * image_in.channels;
+    image_in.contour = (unsigned char *)malloc(sizeof(unsigned char) * image_in.width * image_in.height);
+    memset(image_in.contour, -1, sizeof(unsigned char) * image_in.width * image_in.height);
+    printf("Height: %d\tWidth: %d\tChannels: %d\n", image_in.height, image_in.width, image_in.channels);
+}
+
 void applyGaussianFilter(Image &img_in, Image &img_out)
 {
     int min_row, max_row, min_col, max_col, g_x, g_y, imageIndex;
@@ -42,6 +51,7 @@ void convertToGrayScale(Image &img_out)
         img_out.img[write++] = img_out.img[i] / 3 + img_out.img[i + 1] / 3 + img_out.img[i + 2] / 3;
     img_out.channels = 1;
     img_out.size = img_out.height * img_out.width;
+    img_out.img = (unsigned char *)realloc(img_out.img, sizeof(unsigned char) * img_out.size);
 }
 
 void applySobelFilter(Image &img_out)
@@ -60,8 +70,6 @@ void applySobelFilter(Image &img_out)
             max_row = fmin(row + SOBEL_DIM / 2 + 1, img_out.height);
             min_col = fmax(col - SOBEL_DIM / 2, 0);
             max_col = fmin(col + SOBEL_DIM / 2 + 1, img_out.width);
-            // printf("row| min: %d max: %d\n", min_row, max_row);
-            // printf("col| min: %d max: %d\n", min_col, max_col);
             g_x = 0;
             for (int offX = min_row; offX < max_row; offX++)
             {
@@ -69,23 +77,29 @@ void applySobelFilter(Image &img_out)
                 for (int offY = min_col; offY < max_col; offY++)
                 {
                     sobelSum += img_out.img[(offX * img_out.width + offY) * img_out.channels] * V_SOBEL[g_x][g_y];
-                    // printf("%d ", sobelSum);
                     g_y++;
                 }
                 g_x++;
             }
-            // printf("\n");
             temp_img[imageIndex] = sobelSum;
-            // printf("%d %d\n", g_x, g_y);
-            // if (sobelSum != 0)
-            //     printf("sobelSum: %d\n", sobelSum);
         }
     }
     for (int i = 0; i < img_out.size; i++)
         img_out.img[i] = temp_img[i];
 }
 
-void preprocess(Image &img_in, Image &img_out)
+void setInitBoundary(Image &img)
+{
+    int offX = img.width / 4;
+    int offY = img.height / 4;
+    int boxX = img.width / 2;
+    int boxY = img.height / 2;
+    for (int i = offX; i < offX + boxX; i++)
+        for (int j = offY; j < offY + boxY; j++)
+            img.contour[j * img.width + i] = 1;
+}
+
+void PreProcess(Image &img_in, Image &img_out)
 {
     printf("Will preprocess here [CPU]\n");
     img_out.channels = img_in.channels;
@@ -93,8 +107,17 @@ void preprocess(Image &img_in, Image &img_out)
     img_out.width = img_in.width;
     img_out.size = img_in.size;
     img_out.img = (unsigned char *)malloc(sizeof(unsigned char) * img_in.size);
+    img_out.contour = (unsigned char *)malloc(sizeof(unsigned char) * img_out.width * img_out.height);
 
     applyGaussianFilter(img_in, img_out);
     convertToGrayScale(img_out);
-    applySobelFilter(img_out);
+    setInitBoundary(img_out);
+}
+
+void DestroyImage(Image &img)
+{
+    if (img.img != NULL)
+        free(img.img);
+    if (img.contour != NULL)
+        free(img.contour);
 }
