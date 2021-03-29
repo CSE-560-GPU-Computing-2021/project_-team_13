@@ -14,16 +14,28 @@
 
 typedef struct
 {
-    unsigned char *img=NULL;
+    unsigned char *img = NULL;
     int height;
     int width;
     int channels;
     int size;
-    unsigned char *contour=NULL;
+    int *contour = NULL;
 } Image;
 
 #define GAUSSIAN_DIM 5
 #define SOBEL_DIM 3
+
+#define EPSILON 0.000001
+#define DT 0.1
+#define H 1.0
+#define lambda1 1.0
+#define lambda2 1.0
+#define MU 0.5
+#define NU 0
+#define P 1
+#define ITERATIONS_BREAK 5
+#define PI 3.14159265358979323846264338327950288
+#define COLOR 100
 
 int GAUSSIAN[GAUSSIAN_DIM][GAUSSIAN_DIM] = {
     {1, 4, 7, 4, 1},
@@ -39,6 +51,8 @@ int V_SOBEL[SOBEL_DIM][SOBEL_DIM] = {
 
 void ReadInputImage(Image &image_in, char *input_filename);
 void PreProcess(Image &img_in, Image &img_out);
+void RunChanVeseSegmentation(Image &img);
+void Paint(Image &img);
 
 void DestroyImage(Image &img);
 

@@ -4,8 +4,8 @@ void ReadInputImage(Image &image_in, char *input_filename)
 {
     image_in.img = stbi_load(input_filename, &image_in.width, &image_in.height, &image_in.channels, 3);
     image_in.size = image_in.width * image_in.height * image_in.channels;
-    image_in.contour = (unsigned char *)malloc(sizeof(unsigned char) * image_in.width * image_in.height);
-    memset(image_in.contour, -1, sizeof(unsigned char) * image_in.width * image_in.height);
+    image_in.contour = (int *)malloc(sizeof(int) * image_in.width * image_in.height);
+    memset(image_in.contour, -1, sizeof(int) * image_in.width * image_in.height);
     printf("Height: %d\tWidth: %d\tChannels: %d\n", image_in.height, image_in.width, image_in.channels);
 }
 
@@ -107,11 +107,117 @@ void PreProcess(Image &img_in, Image &img_out)
     img_out.width = img_in.width;
     img_out.size = img_in.size;
     img_out.img = (unsigned char *)malloc(sizeof(unsigned char) * img_in.size);
-    img_out.contour = (unsigned char *)malloc(sizeof(unsigned char) * img_out.width * img_out.height);
+    img_out.contour = (int *)malloc(sizeof(int) * img_out.width * img_out.height);
+    memset(img_out.contour, -1, sizeof(int) * img_out.width * img_out.height);
 
     applyGaussianFilter(img_in, img_out);
     convertToGrayScale(img_out);
     setInitBoundary(img_out);
+}
+
+void GetAverageIntensityOfRegions(Image img, double &c1, double &c2)
+{
+    int i1 = 0, i2 = 0;
+    for (int i = 0; i < img.height; i++)
+    {
+        for (int j = 0; j < img.width; j++)
+        {
+            if (img.contour[j + i * img.width] >= 0)
+            {
+                c1++;
+                i1 += img.img[j + i * img.width];
+            }
+            else
+            {
+                c2++;
+                i2 += img.img[j + i * img.width];
+            }
+        }
+    }
+    c1 = i1 / c1;
+    c2 = i2 / c2;
+}
+
+void GetConstantValues(Image &img, int i, int j, double &F1, double &F2, double &F3, double &F4, double &F, double &L, double &delPhi)
+{
+    double C1 = 1 / sqrt(EPSILON +
+                         pow((img.contour[(i + 1) * img.width + j] - img.contour[i * img.width + j]), 2) +
+                         pow((img.contour[i * img.width + j + 1] - img.contour[i * img.width + j - 1]), 2) / 4);
+
+    double C2 = 1 / sqrt(EPSILON +
+                         pow((img.contour[(i)*img.width + j] - img.contour[(i - 1) * img.width + j]), 2) +
+                         pow((img.contour[(i - 1) * img.width + j + 1] - img.contour[(i - 1) * img.width + j - 1]), 2) / 4);
+
+    double C3 = 1 / sqrt(EPSILON +
+                         pow((img.contour[(i + 1) * img.width + j] - img.contour[(i - 1) * img.width + j]), 2) / 4.0 +
+                         pow((img.contour[(i)*img.width + j + 1] - img.contour[(i)*img.width + j]), 2));
+
+    double C4 = 1 / sqrt(EPSILON +
+                         pow((img.contour[(i + 1) * img.width + j - 1] - img.contour[(i - 1) * img.width + j - 1]), 2) / 4.0 +
+                         pow((img.contour[(i)*img.width + j] - img.contour[(i)*img.width + j - 1]), 2));
+
+    delPhi = H / (PI * (H * H + (img.contour[i * img.width + j]) * (img.contour[i * img.width + j])));
+    double Multiple = DT * delPhi * MU * (double(P) * pow(L, P - 1));
+    F = H / (H + Multiple * (C1 + C2 + C3 + C4));
+    Multiple = Multiple / (H + Multiple * (C1 + C2 + C3 + C4));
+    F1 = Multiple * C1;
+    F2 = Multiple * C2;
+    F3 = Multiple * C3;
+    F4 = Multiple * C4;
+}
+
+void Reinitialize(Image &img, int numIters)
+{
+    // phi is img.contour
+}
+
+void RunChanVeseSegmentation(Image &img)
+{
+    double c1, c2;
+    double F, F1, F2, F3, F4, L = 1, delPhi;
+    for (int mainLoop = 0; mainLoop < ITERATIONS_BREAK; mainLoop++)
+    {
+        c1 = 0;
+        c2 = 0;
+        GetAverageIntensityOfRegions(img, c1, c2);
+        for (int innerLoop = 0; innerLoop < ITERATIONS_BREAK; innerLoop++)
+        {
+            for (int i = 1; i < img.height - 1; i++)
+            {
+                for (int j = 1; j < img.width - 1; j++)
+                {
+                    GetConstantValues(img, i, j, F1, F2, F3, F4, F, L, delPhi);
+                    double CurrPixel = img.contour[i * img.width + j] - DT * delPhi * (NU + lambda1 * pow(img.img[i * img.width + j] - c1, 2) - lambda2 * pow(img.img[i * img.width + j] - c2, 2));
+                    img.contour[i * img.width + j] = F1 * img.contour[(i + 1) * img.width + j] +
+                                                     F2 * img.contour[(i - 1) * img.width + j] +
+                                                     F3 * img.contour[i * img.width + j + 1] +
+                                                     F4 * img.contour[i * img.width + j - 1];
+                }
+            }
+
+            for (int i = 0; i < img.height; i++)
+            {
+                img.contour[i * img.width] = img.contour[i * img.width + 1];
+                img.contour[i * img.width + img.height - 1] = img.contour[i * img.width + img.height - 2];
+            }
+
+            for (int j = 0; j < img.width; j++)
+            {
+                img.contour[j] = img.contour[img.width + j];
+                img.contour[(img.height - 1) * img.width + j] = img.contour[(img.height - 2) * img.width + j];
+            }
+        }
+
+        Reinitialize(img, 100);
+    }
+}
+
+void Paint(Image &img)
+{
+    for (int i = 0; i < img.height; i++)
+        for (int j = 0; j < img.width; j++)
+            if (img.contour[i * img.width + j] < 0)
+                img.img[i * img.width + j] = COLOR;
 }
 
 void DestroyImage(Image &img)

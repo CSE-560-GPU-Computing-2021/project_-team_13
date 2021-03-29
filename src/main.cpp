@@ -16,6 +16,10 @@ int main(int argc, char *argv[])
 
     PreProcess(image_in, image_out);
 
+    RunChanVeseSegmentation(image_out);
+
+    Paint(image_out);
+
     // printf("%d\n", image_out.size);
     // for (int i = 0; i < image_out.size; i+=3)
     //     printf("%d %d %d -> %d %d %d\n", image_in.img[i], image_in.img[i+1], image_in.img[i+2], image_out.img[i], image_out.img[i+1], image_out.img[i+2]);
