@@ -19,7 +19,8 @@ typedef struct
     int width;
     int channels;
     int size;
-    int *contour = NULL;
+    double *contour = NULL;
+    double *prev_contour = NULL;
 } Image;
 
 #define GAUSSIAN_DIM 5

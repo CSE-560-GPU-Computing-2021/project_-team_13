@@ -4,8 +4,8 @@ void ReadInputImage(Image &image_in, char *input_filename)
 {
     image_in.img = stbi_load(input_filename, &image_in.width, &image_in.height, &image_in.channels, 3);
     image_in.size = image_in.width * image_in.height * image_in.channels;
-    image_in.contour = (int *)malloc(sizeof(int) * image_in.width * image_in.height);
-    memset(image_in.contour, -1, sizeof(int) * image_in.width * image_in.height);
+    image_in.contour = (double *)malloc(sizeof(double) * image_in.width * image_in.height);
+    //memset(image_in.contour, -1, sizeof(int) * image_in.width * image_in.height);
     printf("Height: %d\tWidth: %d\tChannels: %d\n", image_in.height, image_in.width, image_in.channels);
 }
 
@@ -90,13 +90,30 @@ void applySobelFilter(Image &img_out)
 
 void setInitBoundary(Image &img)
 {
-    int offX = img.width / 4;
+
+	double x;
+	double y;
+	double radius = (img.width<img.height) ? img.width/2 : img.height/2;
+	radius *= radius;
+	for (unsigned int i = 0; i < img.height; i++)
+	{
+		for (unsigned int j = 0; j < img.width; j++)
+		{
+			x = double(i) - img.height/2.0;
+			y = double(j) - img.width/2.0;
+
+			//printf("pixel val : %f\n" , radius/(radius + x*x + y*y) - 0.5);
+
+			img.contour[i*img.width + j] = 900.0/(900.0 + x*x + y*y) - 0.5;//radius/(radius + x*x + y*y) - 0.5;
+		}
+	}
+    /*int offX = img.width / 4;
     int offY = img.height / 4;
     int boxX = img.width / 2;
     int boxY = img.height / 2;
     for (int i = offX; i < offX + boxX; i++)
         for (int j = offY; j < offY + boxY; j++)
-            img.contour[j * img.width + i] = 1;
+            img.contour[j * img.width + i] = 1;*/
 }
 
 void PreProcess(Image &img_in, Image &img_out)
@@ -107,11 +124,13 @@ void PreProcess(Image &img_in, Image &img_out)
     img_out.width = img_in.width;
     img_out.size = img_in.size;
     img_out.img = (unsigned char *)malloc(sizeof(unsigned char) * img_in.size);
-    img_out.contour = (int *)malloc(sizeof(int) * img_out.width * img_out.height);
-    memset(img_out.contour, -1, sizeof(int) * img_out.width * img_out.height);
+    img_out.contour = (double *)malloc(sizeof(double) * img_out.width * img_out.height);
+    img_out.prev_contour = (double *)malloc(sizeof(double) * img_out.width * img_out.height);
+    //memset(img_out.contour, -1, sizeof(int) * img_out.width * img_out.height);
 
-    applyGaussianFilter(img_in, img_out);
-    convertToGrayScale(img_out);
+    //applyGaussianFilter(img_in, img_out);
+    //if(img_out.channels>1)
+    //	convertToGrayScale(img_out);
     setInitBoundary(img_out);
 }
 
@@ -168,7 +187,75 @@ void GetConstantValues(Image &img, int i, int j, double &F1, double &F2, double 
 
 void Reinitialize(Image &img, int numIters)
 {
+	double a , b , c , d , x , G;
+	
+	int fstop = 0;
+	int width = img.width;
+	int height = img.height;
     // phi is img.contour
+
+    for(int k = 0; k < numIters && fstop == 0; k++){
+    	
+    	for(int i=0;i<height;i++){
+    		for(int j=0;j<width;j++){
+    			img.prev_contour[i*width + j] = img.contour[i*width + j];
+    		}
+    	}
+
+    	for (int i = 1; i < height-1; i++){
+    		for (int j = 1; j < width-1; j++){
+    			a = img.contour[i*width + j] - img.contour[(i-1)*width + j];
+    			b = img.contour[(i+1)*width + j] - img.contour[i*width + j];
+    			c = img.contour[i*width + j] - img.contour[i*width + (j-1)];
+    			d = img.contour[i*width + (j+1)] - img.contour[i*width + j];
+    			if (img.contour[i*width + j] > 0){
+    				G = sqrt(fmax(fmax(a,0.0)*fmax(a,0.0),fmin(b,0.0)*fmin(b,0.0))
+                 			+ fmax(fmax(c,0.0)*fmax(c,0.0),fmin(d,0.0)*fmin(d,0.0))) - 1.0;
+    			}
+    			else if(img.contour[i*width + j] < 0){
+    				G = sqrt(fmax(fmin(a,0.0)*fmin(a,0.0),fmax(b,0.0)*fmax(b,0.0))
+                 			+ fmax(fmin(c,0.0)*fmin(c,0.0),fmax(d,0.0)*fmax(d,0.0))) - 1.0;
+    			}
+    			else{
+    				G=0;
+    			}
+    			x = img.contour[i*width + j] >= 0 ? 1.0 : -1.0;
+    			img.contour[i*width + j] = img.contour[i*width + j] - 0.1*x*G;
+
+    		}
+    	}
+    	// Check stopping condition
+		double Q = 0.0;
+		double M = 0.0;
+		for (int i = 0; i < height; i++)
+		{
+		  for (int j = 0; j < width; j++)
+		  {
+		    if (abs(img.prev_contour[i*width + j]) <= 1)
+		    {
+		      M += 1; 
+		      int sun1 = img.prev_contour[i*width + j];
+		      int sun2 = img.contour[i*width + j];
+		      Q += (sun1 - sun2)>=0 ? sun1-sun2 : sun2-sun1;
+		    }
+		  }
+		}
+		if (M != 0){
+		  Q = Q/((double)M);
+		}
+		else{
+		  Q = 0.0;
+		}
+
+		if (Q < 0.1){
+		  fstop = 1;
+		  //cout << "Stopping condition reached at " << k+1 << " iterations; Q = " << Q << endl;
+		}
+		else
+		{
+		  //cout << "Iteration " << k << ", Q = " << Q << " > " << dt*h*h << endl;
+		}
+    }
 }
 
 void RunChanVeseSegmentation(Image &img)
@@ -208,7 +295,7 @@ void RunChanVeseSegmentation(Image &img)
             }
         }
 
-        Reinitialize(img, 100);
+        //Reinitialize(img, 100);
     }
 }
 
@@ -226,4 +313,6 @@ void DestroyImage(Image &img)
         free(img.img);
     if (img.contour != NULL)
         free(img.contour);
+    if (img.prev_contour != NULL)
+        free(img.prev_contour);
 }
