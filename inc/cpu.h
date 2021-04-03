@@ -318,7 +318,7 @@ void RunChanVeseSegmentation(Image &img)
                 img.contour[j] = img.contour[img.width + j];
                 img.contour[(img.height - 1) * img.width + j] = img.contour[(img.height - 2) * img.width + j];
             }
-            // Reinitialize(img, 100);
+            Reinitialize(img, 100);
         }
     }
 }
