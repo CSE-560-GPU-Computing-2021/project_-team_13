@@ -20,7 +20,15 @@ typedef struct
     int channels;
     int size;
     double *contour = NULL;
-    double *prev_contour = NULL;
+    double *contour0 = NULL;
+    double *contourOld = NULL;
+
+    void copy(double *to, double *from)
+    {
+        for (int i = 0; i < height; i++)
+            for (int j = 0; j < width; j++)
+                to[i * width + j] = from[i * width + j];
+    }
 } Image;
 
 #define GAUSSIAN_DIM 5

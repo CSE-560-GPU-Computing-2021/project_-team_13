@@ -1,13 +1,13 @@
-all: cpu gpu
+all: cpu
 
 cpu: src/main.cpp inc/*
-	g++ -g -DLAUNCH_CPU -O3 -Iinc/ src/main.cpp -o cpu
+	g++ -DLAUNCH_CPU -O3 -Iinc/ src/main.cpp -o cpu
 
 gpu: src/main.cpp inc/*
 	nvcc -DLAUNCH_GPU -O3 -Iinc/ src/main.cpp -o gpu
 
-run: cpu gpu
-	./cpu images/saitama.png
+run: cpu
+	./cpu images/test.pgm
 	# ./gpu images/saitama.png
 
 clean:

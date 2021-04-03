@@ -1,17 +1,6 @@
 #include "defines.h"
 
 
-
-double Sum(Image img){
-  double sum = 0.0;
-  for(int i=0;i<img.height; i++){
-    for(int j=0;j<img.width; j++){
-      sum += img.contour[i*img.width+j];
-    }
-
-  }
-  return sum;
-}
 int main(int argc, char *argv[])
 {
     // Check if filename exists or not
@@ -27,14 +16,9 @@ int main(int argc, char *argv[])
     ReadInputImage(image_in, input_filename);
 
     PreProcess(image_in, image_out);
-    printf("sum %f\n" , Sum(image_out));
     RunChanVeseSegmentation(image_out);
-    printf("sum %f\n" , Sum(image_out));
-    Paint(image_out);
 
-    // printf("%d\n", image_out.size);
-    // for (int i = 0; i < image_out.size; i+=3)
-    //     printf("%d %d %d -> %d %d %d\n", image_in.img[i], image_in.img[i+1], image_in.img[i+2], image_out.img[i], image_out.img[i+1], image_out.img[i+2]);
+    Paint(image_out);
 
     stbi_write_png("output.png", image_out.width, image_out.height, image_out.channels, image_out.img, image_out.width * image_out.channels);
 
