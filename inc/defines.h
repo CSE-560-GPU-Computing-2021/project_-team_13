@@ -4,6 +4,11 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
+/*****************GPU******************/
+#define BLOCK_SIZE_X 16
+#define BLOCK_SIZE_Y 16
+/*****************GPU******************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
