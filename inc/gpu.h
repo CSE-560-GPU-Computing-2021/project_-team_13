@@ -2,7 +2,7 @@
 
 #include <cuda_runtime.h>
 
-extern "C" void Preprocess_kernel(Image &img_in, Image &img_out);
+void Preprocess_kernel(Image &img_in, Image &img_out);
 
 void ReadInputImage(Image &image_in, char *input_filename)
 {

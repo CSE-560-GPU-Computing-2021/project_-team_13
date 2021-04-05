@@ -61,7 +61,7 @@ __global__ void InitContour(double * contour , int width , int height)
 }
 
 
-extern "C" void Preprocess_kernel(Image &img_in, Image &img_out){
+void Preprocess_kernel(Image &img_in, Image &img_out){
 	img_out.channels = img_in.channels;
     img_out.height = img_in.height;
     img_out.width = img_in.width;
@@ -101,7 +101,7 @@ extern "C" void Preprocess_kernel(Image &img_in, Image &img_out){
     //kernel 3
     InitContour <<< grid , block >>>(d_img_contour , img_in.width , img_in.height);
 
-    CudaDeviceSynchronize();
+    cudaDeviceSynchronize();
 
     img_out.channels = 1;
     img_out.size = img_out.height * img_out.width;
