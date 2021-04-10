@@ -1,8 +1,8 @@
 
-#include "defines.h"
+#include "common.h"
 
 
-__global__ void GaussianFilter(unsigned char * img_in , unsigned char * img_out , int width , int height , int channels)
+__global__ void GaussianFilter(unsigned char * img_in , unsigned char * img_out , int width , int height , int channels , int * gaussian_filter)
 {
 	int col = threadIdx.x + blockDim.x*blockIdx.x;
 	int row = threadIdx.y + blockDim.y*blockIdx.y;
@@ -14,10 +14,10 @@ __global__ void GaussianFilter(unsigned char * img_in , unsigned char * img_out 
 	    {
 	        imageIndex = (row * width + col) * channels + channel;
 	        gaussianSum = 0;
-	        min_row = fmax(row - GAUSSIAN_DIM / 2, 0);
-	        max_row = fmin(row + GAUSSIAN_DIM / 2 + 1, height);
-	        min_col = fmax(col - GAUSSIAN_DIM / 2, 0);
-	        max_col = fmin(col + GAUSSIAN_DIM / 2 + 1, width);
+	        min_row = row - GAUSSIAN_DIM / 2 > 0 ? row - GAUSSIAN_DIM / 2 : 0;
+	        max_row = (row + GAUSSIAN_DIM / 2 + 1) < height ? (row + GAUSSIAN_DIM / 2 + 1) :  height;
+	        min_col = col - GAUSSIAN_DIM / 2 > 0 ? col - GAUSSIAN_DIM / 2 : 0;
+	        max_col = (col + GAUSSIAN_DIM / 2 + 1) < width ? (col + GAUSSIAN_DIM / 2 + 1) : width;
 
 	        g_x = 0;
 	        for (int offX = min_row; offX < max_row; offX++)
@@ -25,7 +25,7 @@ __global__ void GaussianFilter(unsigned char * img_in , unsigned char * img_out 
 	            g_y = 0;
 	            for (int offY = min_col; offY < max_col; offY++)
 	            {
-	                gaussianSum += img_in[(offX * width + offY) * channels + channel] * GAUSSIAN[g_x][g_y];
+	                gaussianSum += img_in[(offX * width + offY) * channels + channel] * gaussian_filter[g_x*GAUSSIAN_DIM + g_y];
 	                g_y++;
 	            }
 	            g_x++;
@@ -43,7 +43,7 @@ __global__ void RGB2GRAY(unsigned char * img_in , unsigned char * img_out , int 
 	if (col < width && row < height)
 	{
 		int index = (row*width + col)*channels;
-		img_out[index] = img_out[index] / 3 + img_out.img[index + 1] / 3 + img_out.img[index + 2] / 3;
+		img_out[index] = img_out[index] / 3 + img_out[index + 1] / 3 + img_out[index + 2] / 3;
 	}
 }
 
@@ -75,11 +75,21 @@ void Preprocess_kernel(Image &img_in, Image &img_out){
     /*************** Kernel calls**************/
     int size = img_in.height * img_in.width * img_in.channels;
     unsigned char *d_img_in , *d_img_out , *d_img_flatten; double *d_img_contour;
+    int *gaussian_filter, *d_gaussian_filter;
+    gaussian_filter = (int * )malloc(sizeof(int) * GAUSSIAN_DIM * GAUSSIAN_DIM);
+    for (int i=0;i<GAUSSIAN_DIM; i++){
+    	for(int j=0;j<GAUSSIAN_DIM; j++){
+    		gaussian_filter[i*GAUSSIAN_DIM + j] = GAUSSIAN[i][j];
+    	}
+    }
+
     cudaMalloc((void**)&d_img_in, size*sizeof(unsigned char));
     cudaMalloc((void**)&d_img_out, size*sizeof(unsigned char));
     cudaMalloc((void**)&d_img_flatten, img_in.height * img_in.width * sizeof(unsigned char ));
     cudaMalloc((void**)&d_img_contour, img_in.height * img_in.width * sizeof(double ));
+    cudaMalloc((void**)&d_gaussian_filter, GAUSSIAN_DIM * GAUSSIAN_DIM * sizeof(int ));
     cudaMemcpy(d_img_in, img_in.img, size*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_gaussian_filter, gaussian_filter, GAUSSIAN_DIM * GAUSSIAN_DIM * sizeof(int), cudaMemcpyHostToDevice);
 	//cudaMemcpy(d_img_out, img_out.img, size*sizeof(float), cudaMemcpyHostToDevice);
 
 	
@@ -91,7 +101,7 @@ void Preprocess_kernel(Image &img_in, Image &img_out){
 	grid.y = (img_in.height % block.y==0) ? img_in.height / block.y : img_in.height / block.y+1;
 
 	//kernel 1
-	GaussianFilter <<< grid , block >>> (d_img_in, d_img_out , img_in.width , img_in.height , img_in.channels);
+	GaussianFilter <<< grid , block >>> (d_img_in, d_img_out , img_in.width , img_in.height , img_in.channels , d_gaussian_filter);
     if(img_out.channels>1)
     //kernel 2
     	RGB2GRAY <<< grid , block >>>(d_img_out , d_img_flatten , img_in.width , img_in.height , img_in.channels);
@@ -113,5 +123,7 @@ void Preprocess_kernel(Image &img_in, Image &img_out){
     cudaFree(d_img_out);
     cudaFree(d_img_flatten);
     cudaFree(d_img_contour);
+    cudaFree(d_gaussian_filter);
+    free(gaussian_filter);
 }
 

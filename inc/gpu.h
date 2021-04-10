@@ -1,5 +1,4 @@
 #include "defines.h"
-
 #include <cuda_runtime.h>
 
 void Preprocess_kernel(Image &img_in, Image &img_out);
