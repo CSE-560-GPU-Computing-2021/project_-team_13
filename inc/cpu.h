@@ -119,6 +119,7 @@ void PreProcess(Image &img_in, Image &img_out)
     memcpy(img_out.img, img_in.img, sizeof(unsigned char) * img_in.size);
     
     applyGaussianFilter(img_in, img_out);
+
     if(img_out.channels>1)
     	convertToGrayScale(img_out);
     setInitBoundary(img_out);

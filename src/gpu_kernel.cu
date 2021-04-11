@@ -7,6 +7,7 @@ __global__ void GaussianFilter(unsigned char * img_in , unsigned char * img_out 
 	int col = threadIdx.x + blockDim.x*blockIdx.x;
 	int row = threadIdx.y + blockDim.y*blockIdx.y;
 
+
 	if (col < width && row < height)
 	{
 		int gaussianSum , min_row , max_row , min_col , max_col , g_x , g_y , imageIndex;
@@ -30,6 +31,7 @@ __global__ void GaussianFilter(unsigned char * img_in , unsigned char * img_out 
 	            }
 	            g_x++;
 	        }
+		
 	        img_out[imageIndex] = gaussianSum / 273;
 	    }
 	}
@@ -43,7 +45,7 @@ __global__ void RGB2GRAY(unsigned char * img_in , unsigned char * img_out , int 
 	if (col < width && row < height)
 	{
 		int index = (row*width + col)*channels;
-		img_out[index] = img_out[index] / 3 + img_out[index + 1] / 3 + img_out[index + 2] / 3;
+		img_out[row*width + col] = img_in[index] / 3 + img_in[index + 1] / 3 + img_in[index + 2] / 3;
 	}
 }
 
@@ -63,37 +65,38 @@ __global__ void InitContour(double * contour , int width , int height)
 
 void Preprocess_kernel(Image &img_in, Image &img_out){
 	img_out.channels = img_in.channels;
-    img_out.height = img_in.height;
-    img_out.width = img_in.width;
-    img_out.size = img_in.size;
-    img_out.contour0 = (double *)malloc(sizeof(double) * img_out.width * img_out.height);
-    img_out.contour = (double *)malloc(sizeof(double) * img_out.width * img_out.height);
-    img_out.contourOld = (double *)malloc(sizeof(double) * img_out.width * img_out.height);
-    img_out.img = (unsigned char *)malloc(sizeof(unsigned char) * img_out.size);
-    memcpy(img_out.img, img_in.img, sizeof(unsigned char) * img_in.size);
+	img_out.height = img_in.height;
+	img_out.width = img_in.width;
+	img_out.size = img_in.size;
+	img_out.contour0 = (double *)malloc(sizeof(double) * img_out.width * img_out.height);
+	img_out.contour = (double *)malloc(sizeof(double) * img_out.width * img_out.height);
+	img_out.contourOld = (double *)malloc(sizeof(double) * img_out.width * img_out.height);
+	img_out.img = (unsigned char *)malloc(sizeof(unsigned char) * img_out.size);
+	memcpy(img_out.img, img_in.img, sizeof(unsigned char) * img_in.size);
 
-    /*************** Kernel calls**************/
     int size = img_in.height * img_in.width * img_in.channels;
     unsigned char *d_img_in , *d_img_out , *d_img_flatten; double *d_img_contour;
     int *gaussian_filter, *d_gaussian_filter;
+    
     gaussian_filter = (int * )malloc(sizeof(int) * GAUSSIAN_DIM * GAUSSIAN_DIM);
     for (int i=0;i<GAUSSIAN_DIM; i++){
-    	for(int j=0;j<GAUSSIAN_DIM; j++){
-    		gaussian_filter[i*GAUSSIAN_DIM + j] = GAUSSIAN[i][j];
-    	}
+		for(int j=0;j<GAUSSIAN_DIM; j++){
+			gaussian_filter[i*GAUSSIAN_DIM + j] = GAUSSIAN[i][j];
+		}
     }
 
     cudaMalloc((void**)&d_img_in, size*sizeof(unsigned char));
     cudaMalloc((void**)&d_img_out, size*sizeof(unsigned char));
     cudaMalloc((void**)&d_img_flatten, img_in.height * img_in.width * sizeof(unsigned char ));
-    cudaMalloc((void**)&d_img_contour, img_in.height * img_in.width * sizeof(double ));
-    cudaMalloc((void**)&d_gaussian_filter, GAUSSIAN_DIM * GAUSSIAN_DIM * sizeof(int ));
-    cudaMemcpy(d_img_in, img_in.img, size*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&d_img_contour, img_in.height * img_in.width * sizeof(double));
+    cudaMalloc((void**)&d_gaussian_filter, GAUSSIAN_DIM * GAUSSIAN_DIM * sizeof(int));
+    
+    cudaMemcpy(d_img_in, img_in.img, size * sizeof(unsigned char), cudaMemcpyHostToDevice);
     cudaMemcpy(d_gaussian_filter, gaussian_filter, GAUSSIAN_DIM * GAUSSIAN_DIM * sizeof(int), cudaMemcpyHostToDevice);
-	//cudaMemcpy(d_img_out, img_out.img, size*sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_img_out, img_out.img, size * sizeof(unsigned char), cudaMemcpyHostToDevice);
 
 	
-
+    /*************** Kernel calls**************/
 	dim3 grid , block;
 	block.x = BLOCK_SIZE_X;
 	block.y = BLOCK_SIZE_Y;
@@ -102,12 +105,11 @@ void Preprocess_kernel(Image &img_in, Image &img_out){
 
 	//kernel 1
 	GaussianFilter <<< grid , block >>> (d_img_in, d_img_out , img_in.width , img_in.height , img_in.channels , d_gaussian_filter);
-    if(img_out.channels>1)
-    //kernel 2
-    	RGB2GRAY <<< grid , block >>>(d_img_out , d_img_flatten , img_in.width , img_in.height , img_in.channels);
 
-    //double radius = (img.width < img.height) ? img.width / 2 : img.height / 2;
-    //radius *= radius;
+    // kernel 2  
+    if(img_out.channels>1)
+	  RGB2GRAY <<< grid , block >>>(d_img_out , d_img_flatten , img_in.width , img_in.height , img_in.channels);
+
     //kernel 3
     InitContour <<< grid , block >>>(d_img_contour , img_in.width , img_in.height);
 
@@ -115,10 +117,11 @@ void Preprocess_kernel(Image &img_in, Image &img_out){
 
     img_out.channels = 1;
     img_out.size = img_out.height * img_out.width;
-    cudaMemcpy(img_out.img, d_img_flatten, img_out.size*sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    
+    cudaMemcpy(img_out.img, d_img_flatten, img_out.size * sizeof(unsigned char), cudaMemcpyDeviceToHost);
     img_out.img = (unsigned char *)realloc(img_out.img, sizeof(unsigned char) * img_out.size);
-    cudaMemcpy(img_out.contour0, d_img_contour, img_out.size*sizeof(double), cudaMemcpyDeviceToHost);
-
+    cudaMemcpy(img_out.contour0, d_img_contour, img_out.size * sizeof(double), cudaMemcpyDeviceToHost);
+	
     cudaFree(d_img_in);
     cudaFree(d_img_out);
     cudaFree(d_img_flatten);
