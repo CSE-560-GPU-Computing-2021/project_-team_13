@@ -1,3 +1,5 @@
+#ifndef COMMONS_H_FILE
+#define COMMONS_H_FILE
 /*****************GPU******************/
 #define BLOCK_SIZE_X 16
 #define BLOCK_SIZE_Y 16
@@ -44,12 +46,6 @@ typedef struct
 #define PI 3.14159265358979323846264338327950288
 #define COLOR 100
 
-int GAUSSIAN[GAUSSIAN_DIM][GAUSSIAN_DIM] = {
-    {1, 4, 7, 4, 1},
-    {4, 16, 26, 16, 4},
-    {7, 26, 41, 26, 7},
-    {4, 16, 26, 16, 4},
-    {1, 4, 7, 4, 1}};
 
-
-
+extern int GAUSSIAN[GAUSSIAN_DIM][GAUSSIAN_DIM];
+#endif

@@ -21,6 +21,7 @@ int V_SOBEL[SOBEL_DIM][SOBEL_DIM] = {
     {-1, 0, 1}};
 
 
+
 #ifdef LAUNCH_CPU
 #include "cpu.h"
 #endif
