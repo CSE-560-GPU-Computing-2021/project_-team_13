@@ -1,6 +1,5 @@
 #include "defines.h"
 
-
 int main(int argc, char *argv[])
 {
     // Check if filename exists or not
@@ -16,7 +15,20 @@ int main(int argc, char *argv[])
     ReadInputImage(image_in, input_filename);
 
     PreProcess(image_in, image_out);
+
+    double t1, t2;
+
+    t1 = mysecond();
     RunChanVeseSegmentation(image_out);
+    t2 = mysecond();
+
+    double time_taken = double(t2 - t1);
+#ifdef LAUNCH_CPU
+    printf("Time[CPU]: %f\n", time_taken);
+#endif
+#ifdef LAUNCH_GPU
+    printf("Time[GPU]: %f\n", time_taken);
+#endif
 
     Paint(image_out);
 

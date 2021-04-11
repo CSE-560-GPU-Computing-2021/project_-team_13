@@ -10,14 +10,16 @@
 #include <stdint.h>
 #include <math.h>
 #include <assert.h>
+#include <time.h>
+#include <sys/time.h>
 
 typedef struct
 {
-    unsigned char *img = NULL;
     int height;
     int width;
     int channels;
     int size;
+    unsigned char *img = NULL;
     double *contour = NULL;
     double *contour0 = NULL;
     double *contourOld = NULL;
@@ -48,4 +50,5 @@ typedef struct
 
 
 extern int GAUSSIAN[GAUSSIAN_DIM][GAUSSIAN_DIM];
+extern double mysecond();
 #endif

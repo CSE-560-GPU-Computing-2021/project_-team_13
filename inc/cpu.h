@@ -117,11 +117,11 @@ void PreProcess(Image &img_in, Image &img_out)
     img_out.contourOld = (double *)malloc(sizeof(double) * img_out.width * img_out.height);
     img_out.img = (unsigned char *)malloc(sizeof(unsigned char) * img_out.size);
     memcpy(img_out.img, img_in.img, sizeof(unsigned char) * img_in.size);
-    
+
     applyGaussianFilter(img_in, img_out);
 
-    if(img_out.channels>1)
-    	convertToGrayScale(img_out);
+    if (img_out.channels > 1)
+        convertToGrayScale(img_out);
     setInitBoundary(img_out);
 }
 
@@ -171,22 +171,22 @@ void GetAverageIntensityOfRegions(Image img, double &c1, double &c2)
 void GetConstantValues(Image &img, int i, int j, double &F1, double &F2, double &F3, double &F4, double &F, double &L, double &delPhi)
 {
     double C1 = 1 / sqrt(EPSILON +
-                         pow((img.contour[(i + 1) * img.width + j] - img.contour[i * img.width + j]), 2) +
-                         pow((img.contour[i * img.width + j + 1] - img.contour[i * img.width + j - 1]), 2) / 4);
+                         pow((img.contour0[(i + 1) * img.width + j] - img.contour0[i * img.width + j]), 2) +
+                         pow((img.contour0[i * img.width + j + 1] - img.contour0[i * img.width + j - 1]), 2) / 4);
 
     double C2 = 1 / sqrt(EPSILON +
-                         pow((img.contour[(i)*img.width + j] - img.contour[(i - 1) * img.width + j]), 2) +
-                         pow((img.contour[(i - 1) * img.width + j + 1] - img.contour[(i - 1) * img.width + j - 1]), 2) / 4);
+                         pow((img.contour0[(i)*img.width + j] - img.contour0[(i - 1) * img.width + j]), 2) +
+                         pow((img.contour0[(i - 1) * img.width + j + 1] - img.contour0[(i - 1) * img.width + j - 1]), 2) / 4);
 
     double C3 = 1 / sqrt(EPSILON +
-                         pow((img.contour[(i + 1) * img.width + j] - img.contour[(i - 1) * img.width + j]), 2) / 4.0 +
-                         pow((img.contour[(i)*img.width + j + 1] - img.contour[(i)*img.width + j]), 2));
+                         pow((img.contour0[(i + 1) * img.width + j] - img.contour0[(i - 1) * img.width + j]), 2) / 4.0 +
+                         pow((img.contour0[(i)*img.width + j + 1] - img.contour0[(i)*img.width + j]), 2));
 
     double C4 = 1 / sqrt(EPSILON +
-                         pow((img.contour[(i + 1) * img.width + j - 1] - img.contour[(i - 1) * img.width + j - 1]), 2) / 4.0 +
-                         pow((img.contour[(i)*img.width + j] - img.contour[(i)*img.width + j - 1]), 2));
+                         pow((img.contour0[(i + 1) * img.width + j - 1] - img.contour0[(i - 1) * img.width + j - 1]), 2) / 4.0 +
+                         pow((img.contour0[(i)*img.width + j] - img.contour0[(i)*img.width + j - 1]), 2));
 
-    delPhi = H / (PI * (H * H + (img.contour[i * img.width + j]) * (img.contour[i * img.width + j])));
+    delPhi = H / (PI * (H * H + (img.contour0[i * img.width + j]) * (img.contour0[i * img.width + j])));
     double Multiple = DT * delPhi * MU * (double(P) * pow(L, P - 1));
     F = H / (H + Multiple * (C1 + C2 + C3 + C4));
     Multiple = Multiple / (H + Multiple * (C1 + C2 + C3 + C4));
@@ -278,6 +278,14 @@ void Reinitialize(Image &img, int numIters)
 }
 double Sum(Image img);
 
+void printSum(Image img, double *arr)
+{
+    double s = 0;
+    for (int i = 0; i < img.size; i++)
+        s += arr[i];
+    printf("sum: %f\n", s);
+}
+
 void RunChanVeseSegmentation(Image &img)
 {
     double c1, c2;
@@ -286,7 +294,7 @@ void RunChanVeseSegmentation(Image &img)
 
     for (int mainLoop = 0; mainLoop < ITERATIONS_BREAK; mainLoop++)
     {
-        img.copy(img.contourOld, img.contour);
+        // img.copy(img.contourOld, img.contour);
         c1 = 0;
         c2 = 0;
         GetAverageIntensityOfRegions(img, c1, c2);
@@ -297,29 +305,34 @@ void RunChanVeseSegmentation(Image &img)
             {
                 for (int j = 1; j < img.width - 1; j++)
                 {
+                    // if (i == 1 && j == 1)
+                    //     printf("avg-Intensity: %f %f\n", c1, c2);
                     GetConstantValues(img, i, j, F1, F2, F3, F4, F, L, delPhi);
-                    double CurrPixel = img.contour[i * img.width + j] - DT * delPhi * (NU + lambda1 * pow(img.img[i * img.width + j] - c1, 2) - lambda2 * pow(img.img[i * img.width + j] - c2, 2));
-                    img.contour[i * img.width + j] = F1 * img.contour[(i + 1) * img.width + j] +
-                                                     F2 * img.contour[(i - 1) * img.width + j] +
-                                                     F3 * img.contour[i * img.width + j + 1] +
-                                                     F4 * img.contour[i * img.width + j - 1] + F * CurrPixel;
+                    // exit(255);
+                    double CurrPixel = img.contour0[i * img.width + j] - DT * delPhi * (NU + lambda1 * pow(img.img[i * img.width + j] - c1, 2) - lambda2 * pow(img.img[i * img.width + j] - c2, 2));
+                    img.contour[i * img.width + j] = F1 * img.contour0[(i + 1) * img.width + j] +
+                                                     F2 * img.contour0[(i - 1) * img.width + j] +
+                                                     F3 * img.contour0[i * img.width + j + 1] +
+                                                     F4 * img.contour0[i * img.width + j - 1] + F * CurrPixel;
+                    // if (i == 600 && j == 600)
+                    //     printf("[%d][%d]: %f %f\n", i, j, img.contour[i * img.width + j], CurrPixel);
                 }
-
             }
+            memcpy(img.contour0, img.contour, sizeof(double) * img.size);
 
-            for (int i = 0; i < img.height; i++)
-            {
-                img.contour[i * img.width] = img.contour[i * img.width + 1];
-                img.contour[i * img.width + img.width - 1] = img.contour[i * img.width + img.width - 2];
-                
-            }
+            // for (int i = 0; i < img.height; i++)
+            // {
+            //     img.contour[i * img.width] = img.contour[i * img.width + 1];
+            //     img.contour[i * img.width + img.width - 1] = img.contour[i * img.width + img.width - 2];
 
-            for (int j = 0; j < img.width; j++)
-            {
-                img.contour[j] = img.contour[img.width + j];
-                img.contour[(img.height - 1) * img.width + j] = img.contour[(img.height - 2) * img.width + j];
-            }
-            Reinitialize(img, 100);
+            // }
+
+            // for (int j = 0; j < img.width; j++)
+            // {
+            //     img.contour[j] = img.contour[img.width + j];
+            //     img.contour[(img.height - 1) * img.width + j] = img.contour[(img.height - 2) * img.width + j];
+            // }
+            // Reinitialize(img, 100);
         }
     }
 }
