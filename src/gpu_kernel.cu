@@ -201,16 +201,16 @@ __global__ void ChanVeseCoreKernel(Image img, double *avgIntensity)
 	double Multiple = DT * delPhi * MU * (double(P) * pow(L, P - 1));
 	double F = H / (H + Multiple * (C1 + C2 + C3 + C4));
 	Multiple = Multiple / (H + Multiple * (C1 + C2 + C3 + C4));
-	double F1 = Multiple * C1;
-	double F2 = Multiple * C2;
-	double F3 = Multiple * C3;
-	double F4 = Multiple * C4;
+	// double F1 = Multiple * C1;
+	// double F2 = Multiple * C2;
+	// double F3 = Multiple * C3;
+	// double F4 = Multiple * C4;
 
 	double CurrPixel = i_j - DT * delPhi * (NU + lambda1 * pow(img.img[i * img.width + j] - c1, 2) - lambda2 * pow(img.img[i * img.width + j] - c2, 2));
-	img.contour[i * img.width + j] = F1 * iPlus_j +
-									 F2 * iMinus_j +
-									 F3 * i_jPlus +
-									 F4 * i_jMinus + F * CurrPixel;
+	img.contour[i * img.width + j] = Multiple * C1 * iPlus_j +
+									 Multiple * C2 * iMinus_j +
+									 Multiple * C3 * i_jPlus +
+									 Multiple * C4 * i_jMinus + F * CurrPixel;
 }
 
 void GetAverageIntensityOfRegions(dim3 grid, dim3 block, Image d_img, double *avgIntensity)
