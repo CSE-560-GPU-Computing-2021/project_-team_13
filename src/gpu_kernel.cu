@@ -194,25 +194,34 @@ __global__ void ChanVeseCoreKernel(Image img, double *avgIntensity)
 
 	// if (i == 1 && j == 1)
 	// 	printf("avg-Intensity: %f %f\n", c1, c2);
+	double i_j = img.contour0[i * img.width + j];
+	double iPlus_j = img.contour0[(i + 1) * img.width + j];
+	double i_jPlus = img.contour0[i * img.width + j + 1];
+	double i_jMinus = img.contour0[i * img.width + j - 1];
+	double iMinus_j = img.contour0[(i - 1) * img.width + j];
+	double iMinus_jPlus = img.contour0[(i - 1) * img.width + j + 1];
+	double iMinus_jMinus = img.contour0[(i - 1) * img.width + j - 1];
+	double iPlus_jMinus = img.contour0[(i + 1) * img.width + j - 1];
+
 
 	double L = 1;
 	double C1 = 1 / sqrt(EPSILON +
-						 pow((img.contour0[(i + 1) * img.width + j] - img.contour0[i * img.width + j]), 2) +
-						 pow((img.contour0[i * img.width + j + 1] - img.contour0[i * img.width + j - 1]), 2) / 4);
+						 pow((iPlus_j - i_j), 2) +
+						 pow((i_jPlus - i_jMinus), 2) / 4);
 
 	double C2 = 1 / sqrt(EPSILON +
-						 pow((img.contour0[(i)*img.width + j] - img.contour0[(i - 1) * img.width + j]), 2) +
-						 pow((img.contour0[(i - 1) * img.width + j + 1] - img.contour0[(i - 1) * img.width + j - 1]), 2) / 4);
+						 pow((i_j - iMinus_j), 2) +
+						 pow((iMinus_jPlus - iMinus_jMinus), 2) / 4);
 
 	double C3 = 1 / sqrt(EPSILON +
-						 pow((img.contour0[(i + 1) * img.width + j] - img.contour0[(i - 1) * img.width + j]), 2) / 4.0 +
-						 pow((img.contour0[(i)*img.width + j + 1] - img.contour0[(i)*img.width + j]), 2));
+						 pow((iPlus_j - iMinus_j), 2) / 4.0 +
+						 pow((i_jPlus - i_j), 2));
 
 	double C4 = 1 / sqrt(EPSILON +
-						 pow((img.contour0[(i + 1) * img.width + j - 1] - img.contour0[(i - 1) * img.width + j - 1]), 2) / 4.0 +
-						 pow((img.contour0[(i)*img.width + j] - img.contour0[(i)*img.width + j - 1]), 2));
+						 pow((iPlus_jMinus - iMinus_jMinus), 2) / 4.0 +
+						 pow((iPlus_j - iPlus_jMinus), 2));
 
-	double delPhi = H / (PI * (H * H + (img.contour0[i * img.width + j]) * (img.contour0[i * img.width + j])));
+	double delPhi = H / (PI * (H * H + (i_j) * (i_j)));
 	double Multiple = DT * delPhi * MU * (double(P) * pow(L, P - 1));
 	double F = H / (H + Multiple * (C1 + C2 + C3 + C4));
 	Multiple = Multiple / (H + Multiple * (C1 + C2 + C3 + C4));
@@ -222,11 +231,11 @@ __global__ void ChanVeseCoreKernel(Image img, double *avgIntensity)
 	double F4 = Multiple * C4;
 
 
-	double CurrPixel = img.contour0[i * img.width + j] - DT * delPhi * (NU + lambda1 * pow(img.img[i * img.width + j] - c1, 2) - lambda2 * pow(img.img[i * img.width + j] - c2, 2));
-	img.contour[i * img.width + j] = F1 * img.contour0[(i + 1) * img.width + j] +
-									 F2 * img.contour0[(i - 1) * img.width + j] +
-									 F3 * img.contour0[i * img.width + j + 1] +
-									 F4 * img.contour0[i * img.width + j - 1] + F * CurrPixel;
+	double CurrPixel = i_j - DT * delPhi * (NU + lambda1 * pow(img.img[i * img.width + j] - c1, 2) - lambda2 * pow(img.img[i * img.width + j] - c2, 2));
+	img.contour[i * img.width + j] = F1 * iPlus_j +
+									 F2 * iMinus_j +
+									 F3 * i_jPlus +
+									 F4 * i_jMinus + F * CurrPixel;
 }
 
 void GetAverageIntensityOfRegions(dim3 grid, dim3 block, Image d_img, double *avgIntensity)
