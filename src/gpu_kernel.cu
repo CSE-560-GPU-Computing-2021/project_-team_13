@@ -178,6 +178,11 @@ __global__ void GetAverageIntensityOfRegionsKernel(Image img, double *n1, double
 	}
 }
 
+__device__ double pow(double x, int p)
+{
+	return x * x;
+}
+
 __global__ void ChanVeseCoreKernel(Image img, double *avgIntensity)
 {
 	// Calculate identify threads
@@ -202,7 +207,6 @@ __global__ void ChanVeseCoreKernel(Image img, double *avgIntensity)
 	double iMinus_jPlus = img.contour0[(i - 1) * img.width + j + 1];
 	double iMinus_jMinus = img.contour0[(i - 1) * img.width + j - 1];
 	double iPlus_jMinus = img.contour0[(i + 1) * img.width + j - 1];
-
 
 	double L = 1;
 	double C1 = 1 / sqrt(EPSILON +
@@ -230,7 +234,6 @@ __global__ void ChanVeseCoreKernel(Image img, double *avgIntensity)
 	double F3 = Multiple * C3;
 	double F4 = Multiple * C4;
 
-
 	double CurrPixel = i_j - DT * delPhi * (NU + lambda1 * pow(img.img[i * img.width + j] - c1, 2) - lambda2 * pow(img.img[i * img.width + j] - c2, 2));
 	img.contour[i * img.width + j] = F1 * iPlus_j +
 									 F2 * iMinus_j +
@@ -247,4 +250,3 @@ void ChanVeseCore(dim3 grid, dim3 block, Image &img, double *avgIntensity)
 {
 	ChanVeseCoreKernel<<<grid, block>>>(img, avgIntensity);
 }
-
