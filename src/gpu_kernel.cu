@@ -132,22 +132,6 @@ void Preprocess_kernel(Image &img_in, Image &img_out)
 
 __global__ void GetAverageIntensityOfRegionsKernel(Image img, double *n1, double *n2, double *d1, double *d2)
 {
-	__shared__ double num1;
-	__shared__ double num2;
-	__shared__ double den1;
-	__shared__ double den2;
-
-	// Initialize shared variables (only first thread of every block)
-	if (threadIdx.x == 0 && threadIdx.y == 0)
-	{
-		num1 = 0;
-		num2 = 0;
-		den1 = 0;
-		den2 = 0;
-	}
-
-	// Wait while initialization is being done
-	__syncthreads();
 
 	// Calculate threadId and perform computation
 	int tidX = threadIdx.x + blockIdx.x * blockDim.x;
@@ -159,23 +143,11 @@ __global__ void GetAverageIntensityOfRegionsKernel(Image img, double *n1, double
 
 	double H_phi = 0.5 * (1 + (2 / PI) * atan(img.contour[gIndex] / H));
 
-	// Dump updates to fast shared memory bucket
-	atomicAdd(&num1, ((double)img.img[gIndex] * H_phi));
-	atomicAdd(&den1, H_phi);
-	atomicAdd(&num2, ((double)img.img[gIndex]) * (1 - H_phi));
-	atomicAdd(&den2, 1 - H_phi);
 
-	// Wait while other threads within block dumps there changes to shared memory
-	__syncthreads();
-
-	// Dump changes to global memory
-	if (threadIdx.x == 0 && threadIdx.y == 0)
-	{
-		atomicAdd(n1, num1);
-		atomicAdd(n2, num2);
-		atomicAdd(d1, den1);
-		atomicAdd(d2, den2);
-	}
+	atomicAdd(n1, ((double)img.img[gIndex] * H_phi));
+	atomicAdd(d1, H_phi);
+	atomicAdd(n2, ((double)img.img[gIndex]) * (1 - H_phi));
+	atomicAdd(d2, 1 - H_phi);
 }
 
 __device__ double pow(double x, int p)
