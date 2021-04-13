@@ -132,22 +132,6 @@ void Preprocess_kernel(Image &img_in, Image &img_out)
 
 __global__ void GetAverageIntensityOfRegionsKernel(Image img, double *n1, double *n2, double *d1, double *d2)
 {
-	__shared__ double num1;
-	__shared__ double num2;
-	__shared__ double den1;
-	__shared__ double den2;
-
-	// Initialize shared variables (only first thread of every block)
-	if (threadIdx.x == 0 && threadIdx.y == 0)
-	{
-		num1 = 0;
-		num2 = 0;
-		den1 = 0;
-		den2 = 0;
-	}
-
-	// Wait while initialization is being done
-	__syncthreads();
 
 	// Calculate threadId and perform computation
 	int tidX = threadIdx.x + blockIdx.x * blockDim.x;
@@ -159,23 +143,16 @@ __global__ void GetAverageIntensityOfRegionsKernel(Image img, double *n1, double
 
 	double H_phi = 0.5 * (1 + (2 / PI) * atan(img.contour[gIndex] / H));
 
-	// Dump updates to fast shared memory bucket
-	atomicAdd(&num1, ((double)img.img[gIndex] * H_phi));
-	atomicAdd(&den1, H_phi);
-	atomicAdd(&num2, ((double)img.img[gIndex]) * (1 - H_phi));
-	atomicAdd(&den2, 1 - H_phi);
 
-	// Wait while other threads within block dumps there changes to shared memory
-	__syncthreads();
+	atomicAdd(n1, ((double)img.img[gIndex] * H_phi));
+	atomicAdd(d1, H_phi);
+	atomicAdd(n2, ((double)img.img[gIndex]) * (1 - H_phi));
+	atomicAdd(d2, 1 - H_phi);
+}
 
-	// Dump changes to global memory
-	if (threadIdx.x == 0 && threadIdx.y == 0)
-	{
-		atomicAdd(n1, num1);
-		atomicAdd(n2, num2);
-		atomicAdd(d1, den1);
-		atomicAdd(d2, den2);
-	}
+__device__ double pow(double x, int p)
+{
+	return x * x;
 }
 
 __global__ void ChanVeseCoreKernel(Image img, double *avgIntensity)
@@ -194,39 +171,46 @@ __global__ void ChanVeseCoreKernel(Image img, double *avgIntensity)
 
 	// if (i == 1 && j == 1)
 	// 	printf("avg-Intensity: %f %f\n", c1, c2);
+	double i_j = img.contour0[i * img.width + j];
+	double iPlus_j = img.contour0[(i + 1) * img.width + j];
+	double i_jPlus = img.contour0[i * img.width + j + 1];
+	double i_jMinus = img.contour0[i * img.width + j - 1];
+	double iMinus_j = img.contour0[(i - 1) * img.width + j];
+	double iMinus_jPlus = img.contour0[(i - 1) * img.width + j + 1];
+	double iMinus_jMinus = img.contour0[(i - 1) * img.width + j - 1];
+	double iPlus_jMinus = img.contour0[(i + 1) * img.width + j - 1];
 
 	double L = 1;
 	double C1 = 1 / sqrt(EPSILON +
-						 pow((img.contour0[(i + 1) * img.width + j] - img.contour0[i * img.width + j]), 2) +
-						 pow((img.contour0[i * img.width + j + 1] - img.contour0[i * img.width + j - 1]), 2) / 4);
+						 pow((iPlus_j - i_j), 2) +
+						 pow((i_jPlus - i_jMinus), 2) / 4);
 
 	double C2 = 1 / sqrt(EPSILON +
-						 pow((img.contour0[(i)*img.width + j] - img.contour0[(i - 1) * img.width + j]), 2) +
-						 pow((img.contour0[(i - 1) * img.width + j + 1] - img.contour0[(i - 1) * img.width + j - 1]), 2) / 4);
+						 pow((i_j - iMinus_j), 2) +
+						 pow((iMinus_jPlus - iMinus_jMinus), 2) / 4);
 
 	double C3 = 1 / sqrt(EPSILON +
-						 pow((img.contour0[(i + 1) * img.width + j] - img.contour0[(i - 1) * img.width + j]), 2) / 4.0 +
-						 pow((img.contour0[(i)*img.width + j + 1] - img.contour0[(i)*img.width + j]), 2));
+						 pow((iPlus_j - iMinus_j), 2) / 4.0 +
+						 pow((i_jPlus - i_j), 2));
 
 	double C4 = 1 / sqrt(EPSILON +
-						 pow((img.contour0[(i + 1) * img.width + j - 1] - img.contour0[(i - 1) * img.width + j - 1]), 2) / 4.0 +
-						 pow((img.contour0[(i)*img.width + j] - img.contour0[(i)*img.width + j - 1]), 2));
+						 pow((iPlus_jMinus - iMinus_jMinus), 2) / 4.0 +
+						 pow((iPlus_j - iPlus_jMinus), 2));
 
-	double delPhi = H / (PI * (H * H + (img.contour0[i * img.width + j]) * (img.contour0[i * img.width + j])));
+	double delPhi = H / (PI * (H * H + (i_j) * (i_j)));
 	double Multiple = DT * delPhi * MU * (double(P) * pow(L, P - 1));
 	double F = H / (H + Multiple * (C1 + C2 + C3 + C4));
 	Multiple = Multiple / (H + Multiple * (C1 + C2 + C3 + C4));
-	double F1 = Multiple * C1;
-	double F2 = Multiple * C2;
-	double F3 = Multiple * C3;
-	double F4 = Multiple * C4;
+	// double F1 = Multiple * C1;
+	// double F2 = Multiple * C2;
+	// double F3 = Multiple * C3;
+	// double F4 = Multiple * C4;
 
-
-	double CurrPixel = img.contour0[i * img.width + j] - DT * delPhi * (NU + lambda1 * pow(img.img[i * img.width + j] - c1, 2) - lambda2 * pow(img.img[i * img.width + j] - c2, 2));
-	img.contour[i * img.width + j] = F1 * img.contour0[(i + 1) * img.width + j] +
-									 F2 * img.contour0[(i - 1) * img.width + j] +
-									 F3 * img.contour0[i * img.width + j + 1] +
-									 F4 * img.contour0[i * img.width + j - 1] + F * CurrPixel;
+	double CurrPixel = i_j - DT * delPhi * (NU + lambda1 * pow(img.img[i * img.width + j] - c1, 2) - lambda2 * pow(img.img[i * img.width + j] - c2, 2));
+	img.contour[i * img.width + j] = Multiple * C1 * iPlus_j +
+									 Multiple * C2 * iMinus_j +
+									 Multiple * C3 * i_jPlus +
+									 Multiple * C4 * i_jMinus + F * CurrPixel;
 }
 
 void GetAverageIntensityOfRegions(dim3 grid, dim3 block, Image d_img, double *avgIntensity)
@@ -238,4 +222,3 @@ void ChanVeseCore(dim3 grid, dim3 block, Image &img, double *avgIntensity)
 {
 	ChanVeseCoreKernel<<<grid, block>>>(img, avgIntensity);
 }
-
